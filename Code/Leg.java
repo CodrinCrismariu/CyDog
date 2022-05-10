@@ -1,319 +1,188 @@
 package org.firstinspires.ftc.teamcode.dog;
 
-import static org.firstinspires.ftc.teamcode.RobotConstants.defaultDriveSpeed;
-import static org.firstinspires.ftc.teamcode.dog.Constants.speed;
-import static org.firstinspires.ftc.teamcode.dog.Constants.x1;
-import static org.firstinspires.ftc.teamcode.dog.Constants.x2;
-import static org.firstinspires.ftc.teamcode.dog.Constants.x3;
-import static org.firstinspires.ftc.teamcode.dog.Constants.y1;
-import static org.firstinspires.ftc.teamcode.dog.Constants.y2;
-import static org.firstinspires.ftc.teamcode.dog.Constants.y3;
-
-import com.acmerobotics.dashboard.FtcDashboard;
-import com.acmerobotics.dashboard.config.Config;
-import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
-import com.qualcomm.robotcore.hardware.CRServo;
-import com.qualcomm.robotcore.hardware.DcMotor;
-import com.qualcomm.robotcore.hardware.DcMotorSimple;
-import com.qualcomm.robotcore.hardware.DistanceSensor;
-import com.qualcomm.robotcore.hardware.Servo;
-import com.qualcomm.robotcore.util.ElapsedTime;
-
-import org.checkerframework.checker.units.qual.A;
-import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
-import org.opencv.core.Core;
-import org.opencv.core.Mat;
-import org.opencv.core.MatOfPoint;
-import org.opencv.core.Point;
-import org.opencv.core.Rect;
-import org.opencv.core.Scalar;
-import org.opencv.imgproc.Imgproc;
-import org.openftc.easyopencv.OpenCvCamera;
-import org.openftc.easyopencv.OpenCvCameraFactory;
-import org.openftc.easyopencv.OpenCvCameraRotation;
-import org.openftc.easyopencv.OpenCvInternalCamera2;
-import org.openftc.easyopencv.OpenCvPipeline;
-
 import static java.lang.Math.PI;
 import static java.lang.Math.abs;
 import static java.lang.Math.asin;
-import static java.lang.Math.max;
+import static java.lang.Math.atan2;
 import static java.lang.Math.sqrt;
 
-import java.nio.channels.Pipe;
+import com.qualcomm.robotcore.hardware.HardwareMap;
+import com.qualcomm.robotcore.hardware.Servo;
+import com.qualcomm.robotcore.util.ElapsedTime;
+
+import org.firstinspires.ftc.robotcore.external.Telemetry;
+
 import java.util.ArrayList;
-import java.util.List;
 
-@Config
-class FrontRight {
-    public static double coeff1 = 240;
-    public static double coeff2 = 300;
-    public static double coeff3 = 50;
-    public static double coeff4 = -300;
-    public static double coeff5 = 0.5;
-    public static double coeff6 = 1;
-}
+public class Leg {
 
-@Config
-class FrontLeft {
-    public static double coeff1 = 235;
-    public static double coeff2 = -300;
-    public static double coeff3 = 60;
-    public static double coeff4 = 300;
-    public static double coeff5 = 0.5;
-    public static double coeff6 = 1;
-}
+    double curr_x = 0;
+    double curr_y = 0;
+    double curr_z = 0;
+    ElapsedTime runtime = new ElapsedTime();
 
-@Config
-class BackRight {
-    public static double coeff1 = 250;
-    public static double coeff2 = 300;
-    public static double coeff3 = 55;
-    public static double coeff4 = -300;
-    public static double coeff5 = 0.47;
-    public static double coeff6 = 1;
-}
-
-@Config
-class BackLeft {
-    public static double coeff1 = 250;
-    public static double coeff2 = -300;
-    public static double coeff3 = 65;
-    public static double coeff4 = 300;
-    public static double coeff5 = 0.5;
-    public static double coeff6 = 1;
-}
-
-@Config
-class Constants {
-    public static double speed = 0.17, x1 = 100, x2 = 145, x3 = 145, y1 = -20, y2 = -20, y3 = 50, z = 40;
-}
-
-@com.qualcomm.robotcore.eventloop.opmode.TeleOp(name="LegTeleOp")
-public class LegTeleOp extends LinearOpMode {
-    public ElapsedTime runtime = new ElapsedTime();
-    Leg frontRight, frontLeft, backRight, backLeft;
-    OpenCvCamera camera = null;
-
-    void openCamera() {
-        int cameraMonitorViewId = hardwareMap.appContext.getResources().getIdentifier
-                ("cameraMonitorViewId", "id", hardwareMap.appContext.getPackageName());
-        camera = OpenCvCameraFactory.getInstance().createInternalCamera2(OpenCvInternalCamera2.CameraDirection.FRONT, cameraMonitorViewId);
-        camera.setPipeline(new PipeLine());
-
-        // ------------------ OpenCv code
-        camera.openCameraDeviceAsync(new OpenCvCamera.AsyncCameraOpenListener() {
-
-            @Override
-            public void onOpened() {
-                camera.startStreaming(1280, 720, OpenCvCameraRotation.SIDEWAYS_RIGHT);
-            }
-
-            @Override
-            public void onError(int errorCode) {
-                // ------------------ Tzeapa frate
-            }
-
-        });
-
-        // transmit camera image to laptop
-        FtcDashboard.getInstance().startCameraStream(camera, 0);
+    double dist(Point a, Point b) {
+        return sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
     }
 
-    @Override
-    public void runOpMode() throws InterruptedException {
+    ArrayList<Point> circleIntersection(Point A, double r1, Point B, double r2) {
+        double d = dist(A, B);
 
-        // 0 -> rotation servo
-        // 1 -> height servo
-        // 2 -> tilt servo
+        if (d <= r1 + r2 && d >= abs(r2 - r1)) {
 
-        frontRight = new Leg(hardwareMap, "fr0", "fr1", "fr2",
-                FrontRight.coeff1, FrontRight.coeff2,
-                FrontRight.coeff3, FrontRight.coeff4, FrontRight.coeff5, FrontRight.coeff6);
-        frontLeft = new Leg(hardwareMap, "fl0", "fl1", "fl2",
-                FrontLeft.coeff1, FrontLeft.coeff2,
-                FrontLeft.coeff3, FrontLeft.coeff4, FrontLeft.coeff5, FrontLeft.coeff6);
-        backRight = new Leg(hardwareMap, "br0", "br1", "br2",
-                BackRight.coeff1, BackRight.coeff2,
-                BackRight.coeff3, BackRight.coeff4, BackRight.coeff5, BackRight.coeff6);
-        backLeft = new Leg(hardwareMap, "bl0", "bl1", "bl2",
-                BackLeft.coeff1, BackLeft.coeff2,
-                BackLeft.coeff3, BackLeft.coeff4, BackLeft.coeff5, BackLeft.coeff6);
+            double ex = (B.x - A.x) / d;
+            double ey = (B.y - A.y) / d;
 
-        backLeft.goTo(148, 30);
-        backRight.goTo(148, 30);
-        frontLeft.goTo(148, 30);
-        frontRight.goTo(148, 30);
+            double x = (r1 * r1 - r2 * r2 + d * d) / (2 * d);
+            double y = sqrt(r1 * r1 - x * x);
 
-        openCamera();
+            Point P1 = new Point(A.x + x * ex - y * ey, A.y + x * ey + y * ex);
+            Point P2 = new Point(A.x + x * ex + y * ey, A.y + x * ey - y * ex);
 
-        // Robot class
+            ArrayList<Point> answer = new ArrayList<>();
 
-        waitForStart();
+            answer.add(P1);
+            answer.add(P2);
 
-        Thread l1 = null, l2 = null, l3 = null, l4 = null;
+            return answer;
+        }
 
-        // ------------------ Main Thread
-        while (opModeIsActive()) {
+        return new ArrayList<Point>();
 
-            if (gamepad1.left_stick_y < -0.2) {
-                Thread t1 = new Thread(() -> {
-                    backRight.interpolateTo(x3, y3, 0, 2000 * speed);
-                    backRight.interpolateTo(x1, y1, 0, 1000 * speed);
-                    backRight.interpolateTo(x2, y2, 0, 1000 * speed);
-                    backRight.interpolateTo(x3, y3, 0, 4000 * speed);
-                });
+    }
 
-                Thread t2 = new Thread(() -> {
-                    backLeft.interpolateTo(x3, y3, 0, 6000 * speed);
-                    backLeft.interpolateTo(x1, y1, 0, 1000 * speed);
-                    backLeft.interpolateTo(x2, y2, 0, 1000 * speed);
-                });
+    ArrayList<Double> getAngles(Point E) {
+        Point A = new Point(0, 0);
 
-                Thread t3 = new Thread(() -> {
-                    frontRight.interpolateTo(x3, y3, 0, 4000 * speed);
-                    frontRight.interpolateTo(x1, y1, 0, 1000 * speed);
-                    frontRight.interpolateTo(x2, y2, 0, 1000 * speed);
-                    frontRight.interpolateTo(x3, y3, 0, 2000 * speed);
-                });
+        double d = 72.42;
+        double d1 = 104.35;
+        double d2 = 30;
+        double d3 = 74.35;
+        double d4 = 30;
+        double d5 = 104.35;
 
-                t1.start();
-                t2.start();
-                t3.start();
+        Point B = new Point(0, d);
 
-                frontLeft.interpolateTo(x1, y1, 0, 1000 * speed);
-                frontLeft.interpolateTo(x2, y2, 0, 1000 * speed);
-                frontLeft.interpolateTo(x3, y3, 0, 6000 * speed);
+        ArrayList<Point> inter = circleIntersection(A, d1, E, d5);
 
-                t1.join();
-                t2.join();
-                t3.join();
-            } else if (gamepad1.left_stick_y > 0.2) {
-                Thread t1 = new Thread(() -> {
-                    backRight.interpolateTo(x3, y2, 0, 2000 * speed);
-                    backRight.interpolateTo(x1, y3, 0, 1000 * speed);
-                    backRight.interpolateTo(x2, y3, 0, 1000 * speed);
-                    backRight.interpolateTo(x3, y2, 0, 4000 * speed);
-                });
+        if(inter.size() == 0) {
+            return new ArrayList<>();
+        }
 
-                Thread t2 = new Thread(() -> {
-                    backLeft.interpolateTo(x3, y2, 0, 6000 * speed);
-                    backLeft.interpolateTo(x1, y3, 0, 1000 * speed);
-                    backLeft.interpolateTo(x2, y3, 0, 1000 * speed);
-                });
+        Point D = inter.get(0);
 
-                Thread t3 = new Thread(() -> {
-                    frontRight.interpolateTo(x3, y2, 0, 4000 * speed);
-                    frontRight.interpolateTo(x1, y3, 0, 1000 * speed);
-                    frontRight.interpolateTo(x2, y3, 0, 1000 * speed);
-                    frontRight.interpolateTo(x3, y2, 0, 2000 * speed);
-                });
+        double x = E.x + (D.x - E.x) / d5 * (d5 + d4);
+        double y = E.y + (D.y - E.y) / d5 * (d5 + d4);
 
-                t1.start();
-                t2.start();
-                t3.start();
+        Point C = new Point(x, y);
 
-                frontLeft.interpolateTo(x1, y3, 1000 * speed);
-                frontLeft.interpolateTo(x2, y3, 1000 * speed);
-                frontLeft.interpolateTo(x3, y2, 6000 * speed);
+        inter = circleIntersection(B, d2, C, d3);
 
-                t1.join();
-                t2.join();
-                t3.join();
-            } else if(gamepad1.left_stick_x > 0.2) {
-                Thread t1 = new Thread(() -> {
-                    backRight.interpolateTo(x3, 20, 0, 2000 * speed);
-                    backRight.interpolateTo(x1, 20, Constants.z, 1000 * speed);
-                    backRight.interpolateTo(x2, 20, Constants.z, 1000 * speed);
-                    backRight.interpolateTo(x3, 20, 0, 4000 * speed);
-                });
+        if(inter.size() == 0) {
+            return new ArrayList<>();
+        }
 
-                Thread t2 = new Thread(() -> {
-                    backLeft.interpolateTo(x3, 20, 0,6000 * speed);
-                    backLeft.interpolateTo(x1, 20, Constants.z, 1000 * speed);
-                    backLeft.interpolateTo(x2, 20, Constants.z, 1000 * speed);
-                });
+        Point F = inter.get(1);
 
-                Thread t3 = new Thread(() -> {
-                    frontRight.interpolateTo(x3, 20, 0, 4000 * speed);
-                    frontRight.interpolateTo(x1, 20, Constants.z, 1000 * speed);
-                    frontRight.interpolateTo(x2, 20, Constants.z, 1000 * speed);
-                    frontRight.interpolateTo(x3, 20, 0,2000 * speed);
-                });
+        double angle1 = asin(D.x / dist(A, D)) + (D.y < A.y ? PI : 0);
+        double angle2 = asin(F.x / dist(B, F)) + (F.y < B.y ? PI : 0);
 
-                t1.start();
-                t2.start();
-                t3.start();
+        ArrayList <Double> ans = new ArrayList<>();
 
-                frontLeft.interpolateTo(x1, 20, Constants.z, 1000 * speed);
-                frontLeft.interpolateTo(x2, 20, Constants.z,1000 * speed);
-                frontLeft.interpolateTo(x3, 20, 0,6000 * speed);
+        ans.add(angle1 / PI * 180);
+        ans.add(angle2 / PI * 180);
 
-                t1.join();
-                t2.join();
-                t3.join();
-            } else if(gamepad1.left_stick_x < -0.2) {
-                Thread t1 = new Thread(() -> {
-                    backRight.interpolateTo(x3, 20, 0, 2000 * speed);
-                    backRight.interpolateTo(x1, 20, -Constants.z, 1000 * speed);
-                    backRight.interpolateTo(x2, 20, -Constants.z, 1000 * speed);
-                    backRight.interpolateTo(x3, 20, 0, 4000 * speed);
-                });
+        return ans;
+    }
 
-                Thread t2 = new Thread(() -> {
-                    backLeft.interpolateTo(x3, 20, 0,6000 * speed);
-                    backLeft.interpolateTo(x1, 20, -Constants.z, 1000 * speed);
-                    backLeft.interpolateTo(x2, 20, -Constants.z, 1000 * speed);
-                });
+    Servo s0 = null;
+    Servo s1 = null;
+    Servo s2 = null;
+    double coeff1, coeff2, coeff3, coeff4, coeff5, coeff6;
 
-                Thread t3 = new Thread(() -> {
-                    frontRight.interpolateTo(x3, 20, 0, 4000 * speed);
-                    frontRight.interpolateTo(x1, 20, -Constants.z, 1000 * speed);
-                    frontRight.interpolateTo(x2, 20, -Constants.z, 1000 * speed);
-                    frontRight.interpolateTo(x3, 20, 0,2000 * speed);
-                });
+    Leg(HardwareMap hardwareMap, String s0_name, String s1_name, String s2_name,
+        double coeff1, double coeff2, double coeff3, double coeff4, double coeff5, double coeff6) {
 
-                t1.start();
-                t2.start();
-                t3.start();
+        s0 = hardwareMap.get(Servo.class, s0_name);
+        s1 = hardwareMap.get(Servo.class, s1_name);
+        s2 = hardwareMap.get(Servo.class, s2_name);
 
-                frontLeft.interpolateTo(x1, 20, -Constants.z, 1000 * speed);
-                frontLeft.interpolateTo(x2, 20, -Constants.z,1000 * speed);
-                frontLeft.interpolateTo(x3, 20, 0,6000 * speed);
+        s0.setPosition(coeff5);
 
-                t1.join();
-                t2.join();
-                t3.join();
-            } else {
-                frontLeft.goTo(148, 30, 0);
-                frontRight.goTo(148, 30, 0);
-                backRight.goTo(148, 30, 0);
-                backLeft.goTo(148, 30, 0);
-                telemetry.update();
-//
-            }
+        this.coeff1 = coeff1;
+        this.coeff2 = coeff2;
+        this.coeff3 = coeff3;
+        this.coeff4 = coeff4;
+        this.coeff5 = coeff5;
+        this.coeff6 = coeff6;
+
+        runtime.startTime();
+    }
+
+    void goTo(double x, double y) {
+
+        ArrayList<Double> arr = getAngles(new Point(x, y));
+
+        if(arr.size() > 0) {
+            s1.setPosition(0.5 + (arr.get(1) - coeff1) / coeff2);
+            s2.setPosition(0.5 + (arr.get(0) - coeff3) / coeff4);
+            curr_x = x;
+            curr_y = y;
+        }
+    }
+
+    void goTo(double x, double y, double z) {
+
+        x = sqrt(x * x + z * z);
+        double angle = asin(z / x) / PI * 180;
+
+        ArrayList<Double> arr = getAngles(new Point(x, y));
+
+        if(arr.size() > 0) {
+            s1.setPosition(0.5 + (arr.get(1) - coeff1) / coeff2);
+            s2.setPosition(0.5 + (arr.get(0) - coeff3) / coeff4);
+            curr_x = x;
+            curr_y = y;
+            curr_z = z;
+            s0.setPosition(coeff5 + coeff6 * angle / 300);
         }
 
     }
 
-    class PipeLine extends OpenCvPipeline {
-        boolean viewportPaused = false;
+    void interpolateTo(double x, double y, double milliseconds) {
+        runtime.reset();
 
-        @Override
-        public Mat processFrame(Mat input) {
-            // we can process the frame for image recognition
-            return input;
-        }
+        double Curr_X = curr_x;
+        double Curr_Y = curr_y;
 
-        @Override
-        public void onViewportTapped() {
-            viewportPaused = !viewportPaused;
+        while(runtime.milliseconds() < milliseconds) {
 
-            if (viewportPaused) {
-                camera.pauseViewport();
-            } else {
-                camera.resumeViewport();
-            }
+            double ratio = runtime.milliseconds() / milliseconds;
+            double X = Curr_X * (1 - ratio) + x * ratio;
+            double Y = Curr_Y * (1 - ratio) + y * ratio;
+
+            goTo(X, Y);
+
         }
     }
+
+    void interpolateTo(double x, double y, double z, double milliseconds) {
+        runtime.reset();
+
+        double Curr_X = curr_x;
+        double Curr_Y = curr_y;
+        double Curr_Z = curr_z;
+
+        while(runtime.milliseconds() < milliseconds) {
+
+            double ratio = runtime.milliseconds() / milliseconds;
+            double X = Curr_X * (1 - ratio) + x * ratio;
+            double Y = Curr_Y * (1 - ratio) + y * ratio;
+            double Z = Curr_Z * (1 - ratio) + z * ratio;
+
+            goTo(X, Y, Z);
+
+        }
+    }
+
 }
