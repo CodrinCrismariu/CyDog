@@ -44,6 +44,8 @@ import java.nio.channels.Pipe;
 import java.util.ArrayList;
 import java.util.List;
 
+// Coefficienti pentru a alinia servo-urile pe pozitia corecta
+
 @Config
 class FrontRight {
     public static double coeff1 = 240;
@@ -94,7 +96,8 @@ public class LegTeleOp extends LinearOpMode {
     public ElapsedTime runtime = new ElapsedTime();
     Leg frontRight, frontLeft, backRight, backLeft;
     OpenCvCamera camera = null;
-
+    
+    // deschide camera si transmite datele catre laptop prin FTCDashBoard
     void openCamera() {
         int cameraMonitorViewId = hardwareMap.appContext.getResources().getIdentifier
                 ("cameraMonitorViewId", "id", hardwareMap.appContext.getPackageName());
@@ -126,7 +129,9 @@ public class LegTeleOp extends LinearOpMode {
         // 0 -> rotation servo
         // 1 -> height servo
         // 2 -> tilt servo
-
+        
+        
+        // Initializam picioarele 
         frontRight = new Leg(hardwareMap, "fr0", "fr1", "fr2",
                 FrontRight.coeff1, FrontRight.coeff2,
                 FrontRight.coeff3, FrontRight.coeff4, FrontRight.coeff5, FrontRight.coeff6);
@@ -155,7 +160,9 @@ public class LegTeleOp extends LinearOpMode {
 
         // ------------------ Main Thread
         while (opModeIsActive()) {
-
+            
+            
+            // cand robotul merge in fata
             if (gamepad1.left_stick_y < -0.2) {
                 Thread t1 = new Thread(() -> {
                     backRight.interpolateTo(x3, y3, 0, 2000 * speed);
@@ -189,6 +196,7 @@ public class LegTeleOp extends LinearOpMode {
                 t2.join();
                 t3.join();
             } else if (gamepad1.left_stick_y > 0.2) {
+                // cand robotul merge in spate
                 Thread t1 = new Thread(() -> {
                     backRight.interpolateTo(x3, y2, 0, 2000 * speed);
                     backRight.interpolateTo(x1, y3, 0, 1000 * speed);
@@ -221,6 +229,7 @@ public class LegTeleOp extends LinearOpMode {
                 t2.join();
                 t3.join();
             } else if(gamepad1.left_stick_x > 0.2) {
+                // cand robotul se invarte
                 Thread t1 = new Thread(() -> {
                     backRight.interpolateTo(x3, 20, 0, 2000 * speed);
                        backRight.interpolateTo(x1, 20, Constants.z, 1000 * speed);
@@ -253,6 +262,7 @@ public class LegTeleOp extends LinearOpMode {
                 t2.join();
                 t3.join();
             } else if(gamepad1.left_stick_x < -0.2) {
+                // cand robotul se invarte
                 Thread t1 = new Thread(() -> {
                     backRight.interpolateTo(x3, 20, 0, 2000 * speed);
                     backRight.interpolateTo(x1, 20, -Constants.z, 1000 * speed);
