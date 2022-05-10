@@ -9,6 +9,7 @@ import static org.firstinspires.ftc.teamcode.dog.Constants.y1;
 import static org.firstinspires.ftc.teamcode.dog.Constants.y2;
 import static org.firstinspires.ftc.teamcode.dog.Constants.y3;
 
+import com.acmerobotics.dashboard.FtcDashboard;
 import com.acmerobotics.dashboard.config.Config;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.CRServo;
@@ -20,7 +21,18 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.checkerframework.checker.units.qual.A;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
-import org.firstinspires.ftc.teamcode.dog.Point;
+import org.opencv.core.Core;
+import org.opencv.core.Mat;
+import org.opencv.core.MatOfPoint;
+import org.opencv.core.Point;
+import org.opencv.core.Rect;
+import org.opencv.core.Scalar;
+import org.opencv.imgproc.Imgproc;
+import org.openftc.easyopencv.OpenCvCamera;
+import org.openftc.easyopencv.OpenCvCameraFactory;
+import org.openftc.easyopencv.OpenCvCameraRotation;
+import org.openftc.easyopencv.OpenCvInternalCamera2;
+import org.openftc.easyopencv.OpenCvPipeline;
 
 import static java.lang.Math.PI;
 import static java.lang.Math.abs;
@@ -30,6 +42,7 @@ import static java.lang.Math.sqrt;
 
 import java.nio.channels.Pipe;
 import java.util.ArrayList;
+import java.util.List;
 
 @Config
 class FrontRight {
@@ -80,6 +93,32 @@ class Constants {
 public class LegTeleOp extends LinearOpMode {
     public ElapsedTime runtime = new ElapsedTime();
     Leg frontRight, frontLeft, backRight, backLeft;
+    OpenCvCamera camera = null;
+
+    void openCamera() {
+        int cameraMonitorViewId = hardwareMap.appContext.getResources().getIdentifier
+                ("cameraMonitorViewId", "id", hardwareMap.appContext.getPackageName());
+        camera = OpenCvCameraFactory.getInstance().createInternalCamera2(OpenCvInternalCamera2.CameraDirection.FRONT, cameraMonitorViewId);
+        camera.setPipeline(new PipeLine());
+
+        // ------------------ OpenCv code
+        camera.openCameraDeviceAsync(new OpenCvCamera.AsyncCameraOpenListener() {
+
+            @Override
+            public void onOpened() {
+                camera.startStreaming(1280, 720, OpenCvCameraRotation.SIDEWAYS_RIGHT);
+            }
+
+            @Override
+            public void onError(int errorCode) {
+                // ------------------ Tzeapa frate
+            }
+
+        });
+
+        // transmit camera image to laptop
+        FtcDashboard.getInstance().startCameraStream(camera, 0);
+    }
 
     @Override
     public void runOpMode() throws InterruptedException {
@@ -106,13 +145,13 @@ public class LegTeleOp extends LinearOpMode {
         frontLeft.goTo(148, 30);
         frontRight.goTo(148, 30);
 
+        openCamera();
+
         // Robot class
 
         waitForStart();
 
         Thread l1 = null, l2 = null, l3 = null, l4 = null;
-
-
 
         // ------------------ Main Thread
         while (opModeIsActive()) {
@@ -255,5 +294,26 @@ public class LegTeleOp extends LinearOpMode {
             }
         }
 
+    }
+
+    class PipeLine extends OpenCvPipeline {
+        boolean viewportPaused = false;
+
+        @Override
+        public Mat processFrame(Mat input) {
+            // we can process the frame for image recognition
+            return input;
+        }
+
+        @Override
+        public void onViewportTapped() {
+            viewportPaused = !viewportPaused;
+
+            if (viewportPaused) {
+                camera.pauseViewport();
+            } else {
+                camera.resumeViewport();
+            }
+        }
     }
 }
